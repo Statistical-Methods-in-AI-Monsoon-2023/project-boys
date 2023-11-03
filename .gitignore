@@ -1,1 +1,9 @@
 data/
+/X_combined.npy
+/combined_df.csv
+/column_names.txt
+/combined_reduced.csv
+RFC/new_X.npy
+RFC/__pycache__/scratch_RFC.cpython-311.pyc
+glove.6B.100d.txt
+Multi Class Text Classification word2vec using CNN.ipynb
