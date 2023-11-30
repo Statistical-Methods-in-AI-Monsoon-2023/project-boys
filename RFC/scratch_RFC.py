@@ -2,17 +2,13 @@ import numpy as np
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils import resample
 from tqdm import tqdm
-
-import numpy as np
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.utils import resample
-from tqdm import tqdm
 from collections import Counter
 
 class RandomForestClassifier:
-    def __init__(self, n_estimators=100, max_depth=None, class_weights='balanced_subsample', random_state=None):
+    def __init__(self, n_estimators=100, max_depth=None, max_features=None, class_weights='None', random_state=None):
         self.n_estimators = n_estimators
         self.max_depth = max_depth
+        self.max_features = max_features
         self.class_weights = class_weights
         self.random_state = random_state
         self.estimators = []
@@ -20,6 +16,7 @@ class RandomForestClassifier:
     def fit(self, X, y):
         np.random.seed(self.random_state)
         self.classes_ = np.unique(y)
+        n_samples, n_features = X.shape
 
         if self.class_weights == 'balanced_subsample':
             class_sample_weights = compute_class_sample_weights(y)
@@ -27,15 +24,18 @@ class RandomForestClassifier:
             class_sample_weights = None
 
         for _ in tqdm(range(self.n_estimators), desc="Fitting RFC"):
-            X_bootstrap, y_bootstrap = resample(X, y, replace=True, random_state=self.random_state, stratify=y)
+            feature_indices = np.random.choice(n_features, size=int(0.7*n_features), replace=False) if self.max_features else None
+            row_indices = np.random.choice(n_samples, size=int(0.6*n_samples), replace=True)
+            X_bootstrap, y_bootstrap = X[row_indices, feature_indices], y[row_indices]
+            X_bootstrap = np.squeeze(X_bootstrap)
 
             if self.class_weights == 'balanced_subsample':
                 tree = DecisionTreeClassifier(max_depth=self.max_depth, random_state=self.random_state)
             else:
-                tree = DecisionTreeClassifier(max_depth=self.max_depth, class_weight=self.class_weights, random_state=self.random_state)
+                tree = DecisionTreeClassifier(max_depth=self.max_depth, random_state=self.random_state)
 
-            tree.fit(X_bootstrap, y_bootstrap, sample_weight=class_sample_weights)
-            self.estimators.append(tree)
+            tree.fit(X_bootstrap, y_bootstrap)
+            self.estimators.append((tree, feature_indices))
 
     def predict(self, X):
         if not self.estimators:
@@ -43,7 +43,7 @@ class RandomForestClassifier:
 
         class_predictions = np.zeros((X.shape[0], len(self.classes_)))
 
-        for estimator in self.estimators:
+        for estimator, feature_indices in self.estimators:
             estimator_predictions = estimator.predict(X)
             for i, class_label in enumerate(self.classes_):
                 class_indices = (estimator_predictions == class_label)
